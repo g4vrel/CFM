@@ -21,7 +21,7 @@ class Downsample(nn.Module):
 class Upsample(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.up = nn.Upsample(scale_factor=2, mode='nearest')
+        self.up = nn.Upsample(scale_factor=2, mode="nearest")
         self.conv = nn.Conv2d(in_channels, out_channels, 3, padding=1)
 
     def forward(self, x):
@@ -34,7 +34,9 @@ class AttentionBlock(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = in_channels // num_heads
-        assert in_channels % num_heads == 0, "in_channels must be divisible by num_heads"
+        assert in_channels % num_heads == 0, (
+            "in_channels must be divisible by num_heads"
+        )
 
         self.norm = nn.GroupNorm(num_groups=groups, num_channels=in_channels)
 
@@ -48,17 +50,35 @@ class AttentionBlock(nn.Module):
         h = self.norm(x)
 
         b, c, h_size, w_size = x.shape
-        q = rearrange(self.Q(h), 'b (head_dim num_heads) h w -> b num_heads (h w) head_dim', 
-                      head_dim=self.head_dim, num_heads=self.num_heads)
-        k = rearrange(self.K(h), 'b (head_dim num_heads) h w -> b num_heads (h w) head_dim', 
-                      head_dim=self.head_dim, num_heads=self.num_heads)
-        v = rearrange(self.V(h), 'b (head_dim num_heads) h w -> b num_heads (h w) head_dim', 
-                      head_dim=self.head_dim, num_heads=self.num_heads)
+        q = rearrange(
+            self.Q(h),
+            "b (head_dim num_heads) h w -> b num_heads (h w) head_dim",
+            head_dim=self.head_dim,
+            num_heads=self.num_heads,
+        )
+        k = rearrange(
+            self.K(h),
+            "b (head_dim num_heads) h w -> b num_heads (h w) head_dim",
+            head_dim=self.head_dim,
+            num_heads=self.num_heads,
+        )
+        v = rearrange(
+            self.V(h),
+            "b (head_dim num_heads) h w -> b num_heads (h w) head_dim",
+            head_dim=self.head_dim,
+            num_heads=self.num_heads,
+        )
 
         out = F.scaled_dot_product_attention(q, k, v)
 
-        out = rearrange(out, 'b num_heads (h w) head_dim -> b (head_dim num_heads) h w', 
-                        head_dim=self.head_dim, num_heads=self.num_heads, h=h_size, w=w_size)
+        out = rearrange(
+            out,
+            "b num_heads (h w) head_dim -> b (head_dim num_heads) h w",
+            head_dim=self.head_dim,
+            num_heads=self.num_heads,
+            h=h_size,
+            w=w_size,
+        )
 
         return (x + self.proj(out)) / np.sqrt(2.0)
 
@@ -76,28 +96,36 @@ def make_attn(dim_out, attn):
 
 
 def make_block(dim_in, dim_out, num_groups, dropout=0):
-    return nn.Sequential(nn.GroupNorm(num_groups=num_groups, num_channels=dim_in), 
-                         nn.SiLU(),
-                         nn.Dropout(dropout) if dropout != 0 else nn.Identity(),
-                         nn.Conv2d(dim_in, dim_out, 3, 1, 1))
+    return nn.Sequential(
+        nn.GroupNorm(num_groups=num_groups, num_channels=dim_in),
+        nn.SiLU(),
+        nn.Dropout(dropout) if dropout != 0 else nn.Identity(),
+        nn.Conv2d(dim_in, dim_out, 3, 1, 1),
+    )
 
 
 class ConditioningBlock(nn.Module):
     def __init__(self, dim_out, emb_dim, scale_shift=True):
         super().__init__()
         dim = 2 * dim_out if scale_shift else dim_out
-        self.proj = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(emb_dim, dim)
-        )
-    
+        self.proj = nn.Sequential(nn.SiLU(), nn.Linear(emb_dim, dim))
+
     def forward(self, emb):
         emb = self.proj(emb)[:, :, None, None]
         return emb
-    
+
 
 class ResBlock(nn.Module):
-    def __init__(self, dim_in, dim_out, emb_dim, scale_shift=True, num_groups=32, dropout=0.1, attn=False):
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        emb_dim,
+        scale_shift=True,
+        num_groups=32,
+        dropout=0.1,
+        attn=False,
+    ):
         super().__init__()
         self.scale_shift = scale_shift
 
@@ -125,10 +153,17 @@ class ResBlock(nn.Module):
         return self.attn(h)
 
 
-def get_timestep_embedding(timesteps: torch.Tensor, embedding_dim: int, downscale_freq_shift: 'float' = 0, max_period: int = 10000):
-    assert len(timesteps.shape) == 1, 'Timesteps should be a 1d-array'
+def get_timestep_embedding(
+    timesteps: torch.Tensor,
+    embedding_dim: int,
+    downscale_freq_shift: "float" = 0,
+    max_period: int = 10000,
+):
+    assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
     half_dim = embedding_dim // 2
-    exponent = -math.log(max_period) * torch.arange(start=0, end=half_dim, dtype=torch.float32, device=timesteps.device)
+    exponent = -math.log(max_period) * torch.arange(
+        start=0, end=half_dim, dtype=torch.float32, device=timesteps.device
+    )
     exponent = exponent / (half_dim - downscale_freq_shift)
     emb = torch.exp(exponent)
     emb = timesteps[:, None].float() * emb[None, :]

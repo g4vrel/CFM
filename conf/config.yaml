@@ -1,0 +1,22 @@
+flow:
+  sigma_min: 1e-4
+
+trainer:
+  min_lr: 1e-8
+  max_lr: 5e-4
+  warmup_steps: 45000
+  epochs: 2000
+  max_steps: 400000
+  log_freq: 100
+  accumulation_steps: 2
+
+data:
+  root: data/
+  img_size: 32
+  batch_size: 128
+  num_workers: 16
+  dataset: "cifar10"
+  download: false
+
+sample:
+  size: 32

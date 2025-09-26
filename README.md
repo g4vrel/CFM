@@ -17,6 +17,7 @@ A helpful reference for my theoretical understanding was the paper [Flow Matchin
 - `pytorch`
 - [`einops`](https://einops.rocks/)
 - [`torchdiffeq`](https://github.com/rtqichen/torchdiffeq)
+- [`hydra`](https://hydra.cc/)
 
 ---
 
